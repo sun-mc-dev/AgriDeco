@@ -21,11 +21,13 @@ public final class FoliaScheduler {
      * Overload with a retired callback so callers can react when the
      * target chunk is unloaded before the task runs.
      */
-    public void runAt(Location loc, Runnable task, @Nullable Runnable retired) {
-        plugin.getServer().getRegionScheduler().run(plugin, loc,
-                $ -> task.run(),
-                retired != null ? retired : () -> {
-                });
+    public void runAt(@NotNull Location loc, Runnable task, @Nullable Runnable retired) {
+        var world = loc.getWorld();
+        if (world != null && !world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
+            if (retired != null) retired.run();
+            return;
+        }
+        plugin.getServer().getRegionScheduler().run(plugin, loc, $ -> task.run());
     }
 
     /**

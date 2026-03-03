@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -88,7 +87,7 @@ public final class DataRepository {
     }
 
     @Contract(" -> new")
-    public @NotNull CompletableFuture<List<PlacedFurniture>> loadAllFurniture() {
+    public CompletableFuture<ArrayList<PlacedFurniture>> loadAllFurniture() {
         return CompletableFuture.supplyAsync(() -> {
             var list = new ArrayList<PlacedFurniture>();
             try (var c = db.getConnection();
@@ -115,7 +114,7 @@ public final class DataRepository {
             return list;
         }, io).exceptionally(ex -> {
             plugin.getSLF4JLogger().error("loadAllFurniture — returning empty list due to error", ex);
-            return List.of();
+            return new ArrayList<>();
         });
     }
 
@@ -154,7 +153,7 @@ public final class DataRepository {
     }
 
     @Contract(" -> new")
-    public @NotNull CompletableFuture<List<PlacedCrop>> loadAllCrops() {
+    public CompletableFuture<ArrayList<PlacedCrop>> loadAllCrops() {
         return CompletableFuture.supplyAsync(() -> {
             var list = new ArrayList<PlacedCrop>();
             try (var c = db.getConnection();
@@ -180,7 +179,7 @@ public final class DataRepository {
             return list;
         }, io).exceptionally(ex -> {
             plugin.getSLF4JLogger().error("loadAllCrops — returning empty list due to error", ex);
-            return List.of();
+            return new ArrayList<>();
         });
     }
 }
