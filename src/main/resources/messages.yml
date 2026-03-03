@@ -1,17 +1,134 @@
+# ─────────────────────────────────────────────────────────────
+#  AgriDeco — Messages Configuration
+# ─────────────────────────────────────────────────────────────
+#  All messages use the MiniMessage format (NOT legacy & codes).
+#  Reload with:  /agrideco reload
+# ─────────────────────────────────────────────────────────────
+#
+#  ╔══════════════════════════════════════════════════════════╗
+#  ║              MINIMESSAGE QUICK REFERENCE                 ║
+#  ╠══════════════════════════════════════════════════════════╣
+#  ║  COLORS                                                  ║
+#  ║    Named:   <red>  <green>  <yellow>  <blue>             ║
+#  ║             <aqua>  <gold>  <white>  <gray>              ║
+#  ║             <dark_red>  <dark_green>  <dark_aqua>        ║
+#  ║             <dark_blue>  <dark_gray>  <dark_purple>      ║
+#  ║             <light_purple>  <black>                      ║
+#  ║    Hex RGB: <#FF5733>                                    ║
+#  ║                                                          ║
+#  ║  DECORATIONS                                             ║
+#  ║    <bold>  <italic>  <underlined>                        ║
+#  ║    <strikethrough>  <obfuscated>                         ║
+#  ║    Close with </bold> etc., or reset all with <reset>    ║
+#  ║                                                          ║
+#  ║  GRADIENTS                                               ║
+#  ║    <gradient:#FF0000:#0000FF>text</gradient>             ║
+#  ║    <gradient:red:gold:aqua>multi-stop</gradient>         ║
+#  ║    <rainbow>text</rainbow>                               ║
+#  ║                                                          ║
+#  ║  CLICK & HOVER EVENTS                                    ║
+#  ║    <click:run_command:/spawn>text</click>                ║
+#  ║    <click:open_url:https://example.com>link</click>      ║
+#  ║    <hover:show_text:'<red>tooltip'>text</hover>          ║
+#  ╚══════════════════════════════════════════════════════════╝
+#
+#  ╔══════════════════════════════════════════════════════════╗
+#  ║                   PLACEHOLDERS                           ║
+#  ╠══════════════════════════════════════════════════════════╣
+#  ║  {player}  — the target player's name                    ║
+#  ║  {type}    — "furniture" or "crop seed"                  ║
+#  ║  {id}      — the config ID of the item                   ║
+#  ╚══════════════════════════════════════════════════════════╝
+#
+# ─────────────────────────────────────────────────────────────
+
 messages:
+
+  # ── General ─────────────────────────────────────────────────
+
+  # Shown at the start of certain messages (currently unused as prefix,
+  # but available for customisation — prepend it manually if desired).
   prefix: "<dark_gray>[<green>AgriDeco<dark_gray>] "
-  plugin_reload: "<green>Reloaded successfully. <yellow><italic>(Restart to apply all changes.)"
+
+  # Shown after /agrideco reload completes successfully.
+  plugin_reload: "<green>Reloaded successfully. <yellow><italic>(Restart to apply structural changes.)"
+
+  # Shown when a player lacks the agrideco.admin permission.
   no_permission: "<dark_red>[Error] <red>You don't have permission."
-  invalid_command: "<dark_red>[Error] <red>Usage: /agrideco <reload|give|gui>"
-  invalid_configuration: "<dark_red>[Error] <red>Configuration error. Check console."
+
+  # Shown when /agrideco is run with an unknown or missing sub-command.
+  invalid_command: "<dark_red>[Error] <red>Usage: /agrideco <gray><reload|give|gui>"
+
+  # Shown when config.yml has a syntax error on reload.
+  invalid_configuration: "<dark_red>[Error] <red>Configuration error — check the console."
+
+  # ── Placement ───────────────────────────────────────────────
+
+  # Shown when the block surface is wrong (e.g. placing a floor item on a wall).
   invalid_placement: "<dark_red>[Error] <red>You can't place that there!"
+
+  # Shown when the chunk already contains the maximum number of placed objects.
   chunk_limit: "<dark_red>[Error] <red>Chunk placement limit reached!"
+
+  # Shown on successful furniture placement.
   placed_furniture: "<green>Furniture placed."
+
+  # Shown on successful furniture removal.
   removed_furniture: "<green>Furniture removed."
+
+  # Shown on successful crop planting.
   placed_crop: "<green>Crop planted."
+
+  # ── Seats ───────────────────────────────────────────────────
+
+  # (Add seat-specific messages here if needed in the future.)
+
+  # ── Crops ───────────────────────────────────────────────────
+
+  # Shown when a player harvests a fully grown crop.
   harvested_crop: "<green>Crop harvested!"
-  crop_not_ready: "<yellow>This crop isn't ready yet."
+
+  # Shown when a player tries to harvest a crop that isn't fully grown yet.
+  crop_not_ready: "<yellow>This crop isn't ready to harvest yet."
+
+  # ── Give Command ─────────────────────────────────────────────
+  # Placeholders: {type}, {id}, {player}
+
+  # Shown to the sender after a successful /agrideco give.
   give_success: "<green>Gave <yellow>{type} <gray>'<yellow>{id}<gray>' <green>to <yellow>{player}<green>."
-  give_invalid_id: "<dark_red>[Error] <red>No {type} found with ID '{id}'."
-  give_item_error: "<dark_red>[Error] <red>Could not retrieve MMOItem for this definition."
+
+  # Shown when the given ID doesn't match any furniture/crop definition.
+  give_invalid_id: "<dark_red>[Error] <red>No {type} found with ID '<yellow>{id}<red>'."
+
+  # Shown when the MMOItem for a definition could not be retrieved.
+  give_item_error: "<dark_red>[Error] <red>Could not retrieve the MMOItem for this definition."
+
+  # Shown when the target player name is not online.
   player_not_found: "<dark_red>[Error] <red>Player not found."
+
+# ─────────────────────────────────────────────────────────────
+#  COLOR & GRADIENT EXAMPLES  (copy-paste ready)
+# ─────────────────────────────────────────────────────────────
+#
+#  Solid hex color:
+#    "<#4CAF50>Success!"
+#
+#  Two-stop gradient:
+#    "<gradient:#ff6b6b:#ffd93d>Hot text</gradient>"
+#
+#  Three-stop gradient:
+#    "<gradient:#4facfe:#00f2fe:#a18cd1>Cool title</gradient>"
+#
+#  Rainbow:
+#    "<rainbow>AgriDeco</rainbow>"
+#
+#  Bold + italic + color:
+#    "<gold><bold><italic>Important!</italic></bold>"
+#
+#  Hover tooltip:
+#    "<hover:show_text:'<gray>Config ID: chair'><yellow>Chair</yellow></hover>"
+#
+#  Clickable run-command:
+#    "<click:run_command:/agrideco gui><aqua>[Open GUI]</aqua></click>"
+#
+# ─────────────────────────────────────────────────────────────

@@ -1,55 +1,200 @@
-storage-type: sqlite   # sqlite | mysql
+# ─────────────────────────────────────────────────────────────
+#  AgriDeco — Main Configuration
+#  Plugin by SunMC
+# ─────────────────────────────────────────────────────────────
+#  After editing this file run:  /agrideco reload
+#  Note: structural changes (new furniture/crop definitions,
+#        growth timings) require a full server restart to apply
+#        to already-placed objects.
+# ─────────────────────────────────────────────────────────────
 
+# Storage backend.
+# Options: sqlite | mysql
+# SQLite  — single file, no setup needed, recommended for small servers.
+# MySQL   — external database, recommended for networks / BungeeCord.
+storage-type: sqlite
+
+# ─────────────────────────────────────────────────────────────
+#  General Settings
+# ─────────────────────────────────────────────────────────────
 settings:
+
+  # Maximum block distance at which virtual armor-stand entities
+  # (furniture & crops) are sent to a player's client.
+  # Higher values = more network traffic. Default: 32
   armorstands_max_distance: 32
+
+  # Permission node required to use /agrideco reload, give, and gui.
   reload_permission: "agrideco.admin"
+
+  # Maximum number of placed objects allowed per chunk.
+  # Prevents chunk-lag from over-decoration.
   chunk_limit:
     furnitures: 32
     crops: 64
 
+# ─────────────────────────────────────────────────────────────
+#  AuraSkills Integration
+#  Requires: AuraSkills plugin (softdepend)
+# ─────────────────────────────────────────────────────────────
+aura_skills:
+  # The skill that receives XP when a crop is harvested.
+  # Use built-in skill names (e.g. farming, foraging, fishing)
+  # OR the namespaced ID of a custom skill (e.g. my_pack:herbalism).
+  skill: "farming"
+
+# ─────────────────────────────────────────────────────────────
+#  MySQL Database (only used when storage-type: mysql)
+# ─────────────────────────────────────────────────────────────
 database:
   host: "localhost"
   port: 3306
-  database: "agrideco"
+  database: "agrideco"   # Name of the database/schema
   username: "root"
   password: "password"
-  pool:
-    maximum_pool_size: 10
-    minimum_idle: 2
-    connection_timeout: 30000
-    idle_timeout: 600000
-    max_lifetime: 1800000
 
+  # Connection pool tuning (HikariCP).
+  # For most servers the defaults are fine.
+  pool:
+    maximum_pool_size: 10     # Max simultaneous DB connections
+    minimum_idle: 2           # Connections kept open when idle
+    connection_timeout: 30000 # ms to wait for a free connection before error
+    idle_timeout: 600000      # ms before an idle connection is closed
+    max_lifetime: 1800000     # ms maximum lifetime of any connection
+
+# ─────────────────────────────────────────────────────────────
+#  Furniture Definitions
+#  Each key (e.g. 'chair', 'lamp') is the config ID used in
+#  /agrideco give furniture <id> and stored in the database.
+# ─────────────────────────────────────────────────────────────
 furniture:
-  '1':
-    id: "mmoitems:TYPE:ID"
+
+  # ── Example: a simple decorative chair ──────────────────────
+  chair:
+    # MMOItems reference: "mmoitems:<TYPE>:<ID>"
+    # This is the item players hold to place the furniture.
+    id: "mmoitems:FURNITURE:CHAIR"
+
+    # Where the furniture can be placed.
+    # Options: floor | wall | ceiling
     placement_type: "floor"
-    furniture_type: "interactable"
-    interaction_mmoitem_id: "mmoitems:TYPE:ID"
+
+    # What happens when a player right-clicks the armor stand.
+    # Options:
+    #   decorative   — nothing happens on click
+    #   interactable — toggles between two visual states (id / interaction_mmoitem_id)
+    #   container    — opens a chest-like inventory
+    #   seat         — player sits on the furniture
+    #   light        — reserved for future light-toggle support
+    furniture_type: "seat"
+
+    # Only used when furniture_type is 'interactable'.
+    # This MMOItem is shown as the head when the toggle state is ON (state = 1).
+    interaction_mmoitem_id: "mmoitems:FURNITURE:CHAIR_OPEN"
+
+    # Only used when furniture_type is 'container'.
     container:
-      title: "&8Container"
+      title: "<dark_gray>Storage"  # MiniMessage format
+      size: 27                     # Must be a multiple of 9 (9, 18, 27, 36, 45, 54)
+
+    # Offset applied to the placement location when spawning the armor stand.
+    # Format: "x, y, z"  — decimals allowed, can be negative.
+    armorstand:
+      offset: "0, 0, 0"
+      is_baby: false   # Baby armor stands are smaller — useful for low-profile items
+
+    # Only used when furniture_type is 'seat'.
+    # Offset from the furniture's base location where the player sits.
+    seat_offset: "0, 0.3, 0"
+
+    # List of block offsets where BARRIER blocks are placed to prevent
+    # players walking through the furniture. One entry = one barrier block.
+    # Use "0, 0, 0" to place a barrier at the furniture's own location.
+    barrier_offsets:
+      - "0, 0, 0"
+
+  # ── Example: a wall-mounted lamp ─────────────────────────────
+  wall_lamp:
+    id: "mmoitems:FURNITURE:WALL_LAMP"
+    placement_type: "wall"
+    furniture_type: "interactable"
+    interaction_mmoitem_id: "mmoitems:FURNITURE:WALL_LAMP_ON"
+    container:
+      title: "<dark_gray>Container"
       size: 9
     armorstand:
-      offset: "0, 0.5, 0"
+      offset: "0, 1.2, 0"
       is_baby: true
     seat_offset: "0.5, 0, 0.5"
-    barrier_offsets: [ "0, 0, 0" ]
+    barrier_offsets:
+      - "0, 0, 0"
 
+# ─────────────────────────────────────────────────────────────
+#  Crop Definitions
+#  Each key (e.g. 'carrot', 'blueberry') is the config ID used
+#  in /agrideco give crop <id> and stored in the database.
+# ─────────────────────────────────────────────────────────────
 crops:
-  '1':
+
+  # ── Example: a two-stage custom carrot ───────────────────────
+  carrot:
+    # Ordered list of MMOItem IDs for each growth stage.
+    # Stage 0 = just planted, last stage = fully grown.
+    # The last entry's item is also dropped on harvest.
     crop_stage_ids:
       - "mmoitems:INGREDIENTS:CARROT_STAGE_I"
       - "mmoitems:INGREDIENTS:CARROT_STAGE_II"
+
+    # MMOItem ID of the seed item players hold to plant this crop.
     seed_id: "mmoitems:INGREDIENTS:CARROT_SEED"
+
+    # The block type that must be directly below the placement location.
+    # Uses Bukkit Material names (case-insensitive). Default: farmland
     placement_block_type: "farmland"
+
+    # How often (in ticks) the growth check runs.
+    # 20 ticks = 1 second. Default: 120 (6 seconds)
     growth_time: 120
+
+    # Percentage chance (0–100) that the crop advances one stage
+    # each time the growth timer fires. Default: 40
     growth_chance: 40
+
+    # AuraSkills XP granted to the harvesting player.
+    # Uses the skill defined in settings.aura_skills.skill above.
+    # Set to 0 to disable.
     aura_skills:
       experience: 1.4
+
+    # JobsReborn reward granted on harvest.
+    # job_id must match the job name in Jobs' config exactly.
+    # Set experience/money to 0 to disable individually.
     jobs:
       job_id: "farming"
       experience: 5.4
       money: 100.4
+
+    # Armor stand visual offset and size, same as furniture above.
     armorstand:
       offset: "0, 0.5, 0"
       is_baby: true
+
+  # ── Example: a three-stage blueberry bush ────────────────────
+  blueberry:
+    crop_stage_ids:
+      - "mmoitems:INGREDIENTS:BLUEBERRY_STAGE_I"
+      - "mmoitems:INGREDIENTS:BLUEBERRY_STAGE_II"
+      - "mmoitems:INGREDIENTS:BLUEBERRY_STAGE_III"
+    seed_id: "mmoitems:INGREDIENTS:BLUEBERRY_SEED"
+    placement_block_type: "grass_block"
+    growth_time: 200
+    growth_chance: 25
+    aura_skills:
+      experience: 2.0
+    jobs:
+      job_id: "farming"
+      experience: 8.0
+      money: 150.0
+    armorstand:
+      offset: "0, 0.3, 0"
+      is_baby: false
