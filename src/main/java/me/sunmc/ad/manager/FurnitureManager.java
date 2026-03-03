@@ -142,7 +142,8 @@ public final class FurnitureManager {
 
     private void openContainer(@NotNull Player player, @NotNull FurnitureDef def) {
         var inv = plugin.getServer().createInventory(
-                null, def.getContainerSize(), ColorUtil.translate(def.getContainerTitle()));
+                null, def.getContainerSize(),
+                ColorUtil.component(def.getContainerTitle()));
         player.openInventory(inv);
     }
 
@@ -158,7 +159,7 @@ public final class FurnitureManager {
                 as.setCollidable(false);
             });
             seatStands.put(stand.getUniqueId(), pf.getUuid());
-            player.startRiding(stand, true);
+            stand.addPassenger(player);
         });
     }
 

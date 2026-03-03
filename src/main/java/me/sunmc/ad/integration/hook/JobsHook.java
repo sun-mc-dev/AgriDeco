@@ -1,8 +1,11 @@
 package me.sunmc.ad.integration.hook;
 
 import com.gamingmesh.jobs.Jobs;
+import com.gamingmesh.jobs.container.CurrencyType;
 import me.sunmc.ad.AgriDeco;
 import org.bukkit.entity.Player;
+
+import java.util.Map;
 
 public final class JobsHook {
 
@@ -23,8 +26,11 @@ public final class JobsHook {
             var jp = Jobs.getPlayerManager().getJobsPlayer(player);
             var job = Jobs.getJob(jobId);
             if (jp == null || job == null) return;
-            jp.addExperience(job, exp);
-            Jobs.getEconomy().pay(jp, money);
+
+            var prog = jp.getJobProgression(job);
+            if (prog != null) prog.addExperience(exp);
+
+            Jobs.getEconomy().pay(jp, Map.of(CurrencyType.MONEY, money));
         } catch (Exception ignored) {
         }
     }

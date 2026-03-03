@@ -6,7 +6,6 @@ import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
-import com.github.retrooper.packetevents.protocol.entity.data.EntityMetadataProvider;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.Equipment;
@@ -26,7 +25,6 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,15 +66,11 @@ public final class PacketHandler extends PacketListenerAbstract {
                 loc.getPitch(), loc.getYaw(), loc.getYaw(),
                 0, Optional.empty());
 
-        WrapperPlayServerEntityMetadata metaPkt = null;
-        try {
-            List<EntityData<EntityMetadataProvider>> meta = new ArrayList<>();
-            meta.add(new EntityData(0, EntityDataTypes.BYTE, (byte) (invisible ? 0x20 : 0x00)));
-            meta.add(new EntityData(15, EntityDataTypes.BYTE, (byte) ((small ? 0x01 : 0x00) | 0x08 | 0x10)));
-            metaPkt = new WrapperPlayServerEntityMetadata(entityId, (EntityMetadataProvider) meta);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        List<EntityData<?>> meta = List.of(
+                new EntityData<>(0,  EntityDataTypes.BYTE, (byte) (invisible ? 0x20 : 0x00)),
+                new EntityData<>(15, EntityDataTypes.BYTE, (byte) ((small ? 0x01 : 0x00) | 0x08 | 0x10))
+        );
+        var metaPkt = new WrapperPlayServerEntityMetadata(entityId, meta);
 
         var peItem = SpigotConversionUtil.fromBukkitItemStack(headItem);
         var equipPkt = new WrapperPlayServerEntityEquipment(
