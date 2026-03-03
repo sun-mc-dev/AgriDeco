@@ -21,6 +21,9 @@ public final class FurnitureDef {
     private final boolean armorstandBaby;
     private final Vector seatOffset;
     private final List<Vector> barrierOffsets;
+    private final String placePermission;
+    private final String removePermission;
+    private final boolean removeDropItem;
 
     private FurnitureDef(@NotNull Builder b) {
         id = b.id;
@@ -33,6 +36,9 @@ public final class FurnitureDef {
         armorstandBaby = b.armorstandBaby;
         seatOffset = DirectionUtil.parseVector(b.seatOffset);
         barrierOffsets = b.barrierOffsets.stream().map(DirectionUtil::parseVector).toList();
+        placePermission = b.placePermission;
+        removePermission = b.removePermission;
+        removeDropItem = b.removeDropItem;
     }
 
     @Contract(" -> new")
@@ -80,17 +86,32 @@ public final class FurnitureDef {
         return barrierOffsets;
     }
 
+    public String getPlacePermission() {
+        return placePermission;
+    }
+
+    public String getRemovePermission() {
+        return removePermission;
+    }
+
+    public boolean isRemoveDropItem() {
+        return removeDropItem;
+    }
+
     public static final class Builder {
         private String id = "";
         private PlacementType placementType = PlacementType.FLOOR;
         private FurnitureType furnitureType = FurnitureType.DECORATIVE;
         private String interactionId = "";
-        private String containerTitle = "&8Container";
+        private String containerTitle = "<dark_gray>Container"; // Fix: was "&8Container" (legacy codes)
         private int containerSize = 9;
         private String armorstandOffset = "0,0,0";
         private boolean armorstandBaby = false;
         private String seatOffset = "0.5,0,0.5";
         private List<String> barrierOffsets = List.of("0,0,0");
+        private String placePermission = "";
+        private String removePermission = "";
+        private boolean removeDropItem = true;
 
         public Builder id(String v) {
             id = v;
@@ -139,6 +160,21 @@ public final class FurnitureDef {
 
         public Builder barrierOffsets(List<String> v) {
             barrierOffsets = v;
+            return this;
+        }
+
+        public Builder placePermission(String v) {
+            placePermission = v;
+            return this;
+        }
+
+        public Builder removePermission(String v) {
+            removePermission = v;
+            return this;
+        }
+
+        public Builder removeDropItem(boolean v) {
+            removeDropItem = v;
             return this;
         }
 

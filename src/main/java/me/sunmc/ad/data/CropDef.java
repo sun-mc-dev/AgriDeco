@@ -20,6 +20,8 @@ public final class CropDef {
     private final double jobMoney;
     private final Vector armorstandOffset;
     private final boolean armorstandBaby;
+    private final String placePermission;
+    private final boolean ownerOnlyHarvest;
 
     private CropDef(@NotNull Builder b) {
         stageIds = List.copyOf(b.stageIds);
@@ -33,6 +35,8 @@ public final class CropDef {
         jobMoney = b.jobMoney;
         armorstandOffset = DirectionUtil.parseVector(b.armorstandOffset);
         armorstandBaby = b.armorstandBaby;
+        placePermission = b.placePermission;
+        ownerOnlyHarvest = b.ownerOnlyHarvest;
     }
 
     @Contract(" -> new")
@@ -84,6 +88,14 @@ public final class CropDef {
         return armorstandBaby;
     }
 
+    public String getPlacePermission() {
+        return placePermission;
+    }
+
+    public boolean isOwnerOnlyHarvest() {
+        return ownerOnlyHarvest;
+    }
+
     public boolean isFullyGrown(int s) {
         return s >= stageIds.size() - 1;
     }
@@ -100,6 +112,8 @@ public final class CropDef {
         private double jobMoney = 0;
         private String armorstandOffset = "0,0,0";
         private boolean armorstandBaby = false;
+        private String placePermission = "";
+        private boolean ownerOnlyHarvest = false;
 
         public Builder stageIds(List<String> v) {
             stageIds = v;
@@ -153,6 +167,16 @@ public final class CropDef {
 
         public Builder armorstandBaby(boolean v) {
             armorstandBaby = v;
+            return this;
+        }
+
+        public Builder placePermission(String v) {
+            placePermission = v;
+            return this;
+        }
+
+        public Builder ownerOnlyHarvest(boolean v) {
+            ownerOnlyHarvest = v;
             return this;
         }
 

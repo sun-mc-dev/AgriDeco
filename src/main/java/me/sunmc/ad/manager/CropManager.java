@@ -11,12 +11,12 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class CropManager {
@@ -27,17 +27,18 @@ public final class CropManager {
     private final ConcurrentHashMap<Integer, UUID> byEntityId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Integer> chunkCount = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, ScheduledTask> growthTasks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, List<UUID>> byChunk = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<UUID>> byChunk = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> placeCooldowns = new ConcurrentHashMap<>();
 
     public CropManager(AgriDeco plugin) {
         this.plugin = plugin;
     }
 
+
     public void loadFromDatabase() {
         plugin.getDataRepository().loadAllCrops().thenAccept(list -> {
             for (var crop : list) {
                 register(crop);
-
                 plugin.getFoliaScheduler().runAt(crop.getLocation(), () -> {
                     spawnVisual(crop);
                     scheduleGrowth(crop);
@@ -51,6 +52,12 @@ public final class CropManager {
     public boolean plant(Player player, String configId, Location loc) {
         var def = plugin.getConfigManager().getCropDefs().get(configId);
         if (def == null) return false;
+
+        // Per-crop place permission
+        if (!def.getPlacePermission().isEmpty() && !player.hasPermission(def.getPlacePermission())) {
+            plugin.getMessagesManager().send(player, "no_permission");
+            return false;
+        }
         if (!loc.clone().subtract(0, 1, 0).getBlock().getType().name()
                 .equalsIgnoreCase(def.getPlacementBlock())) {
             plugin.getMessagesManager().send(player, "invalid_placement");
@@ -65,11 +72,14 @@ public final class CropManager {
             plugin.getMessagesManager().send(player, "invalid_placement");
             return false;
         }
+        if (!checkCooldown(player)) return false;
+
         var crop = new PlacedCrop(UUID.randomUUID(), configId, loc, player.getUniqueId(), VirtualEntity.nextId());
         register(crop);
         spawnVisual(crop);
         scheduleGrowth(crop);
         plugin.getDataRepository().saveCrop(crop);
+        plugin.getConfigManager().getSoundPlantCrop().play(loc);
         plugin.getMessagesManager().send(player, "placed_crop");
         return true;
     }
@@ -79,21 +89,32 @@ public final class CropManager {
         if (crop == null) return false;
         var def = plugin.getConfigManager().getCropDefs().get(crop.getConfigId());
         if (def == null) return false;
+
+        // Ownership check: per-crop or global setting (admins bypass)
+        boolean ownerOnly = plugin.getConfigManager().isCropOwnerOnlyHarvest() || def.isOwnerOnlyHarvest();
+        if (ownerOnly
+                && !crop.getOwnerUuid().equals(player.getUniqueId())
+                && !player.hasPermission(plugin.getConfigManager().getReloadPermission())) {
+            plugin.getMessagesManager().send(player, "not_owner");
+            return false;
+        }
         if (!def.isFullyGrown(crop.getStage())) {
             plugin.getMessagesManager().send(player, "crop_not_ready");
             return false;
         }
+
         plugin.getFoliaScheduler().runAsync(() -> {
             plugin.getIntegrations().grantAuraExp(player, def.getAuraExp());
             plugin.getIntegrations().grantJobReward(player, def.getJobId(), def.getJobExp(), def.getJobMoney());
         });
+
         var drop = plugin.getIntegrations().getMmoItem(def.getStageIds().get(def.getStageIds().size() - 1));
-        if (drop != null)
-            crop.getLocation().getWorld().dropItemNaturally(crop.getLocation(), drop);
+        if (drop != null) crop.getLocation().getWorld().dropItemNaturally(crop.getLocation(), drop);
 
         unregister(crop);
         plugin.getPacketHandler().despawnEntity(crop.getVirtualEntityId(), crop.getLocation());
         plugin.getDataRepository().deleteCrop(crop.getUuid());
+        plugin.getConfigManager().getSoundHarvestCrop().play(crop.getLocation());
         plugin.getMessagesManager().send(player, "harvested_crop");
         return true;
     }
@@ -121,12 +142,10 @@ public final class CropManager {
             return;
         }
         if (!crop.tryAdvanceStage(cur, cur + 1)) return;
-
-        UUID cropUuid = crop.getUuid();
         plugin.getPacketHandler().despawnEntity(crop.getVirtualEntityId(), crop.getLocation());
         spawnVisual(crop);
         plugin.getDataRepository().saveCrop(crop);
-        if (def.isFullyGrown(crop.getStage())) cancelGrowth(cropUuid);
+        if (def.isFullyGrown(crop.getStage())) cancelGrowth(crop.getUuid());
     }
 
     private void cancelGrowth(UUID uuid) {
@@ -139,7 +158,6 @@ public final class CropManager {
         if (def == null) return;
         var head = resolveStageHead(def, crop.getStage());
         var visual = crop.getLocation().add(def.getArmorstandOffset());
-
         UUID cropUuid = crop.getUuid();
         plugin.getPacketHandler().spawnArmorStand(
                 crop.getVirtualEntityId(), visual, head,
@@ -162,12 +180,28 @@ public final class CropManager {
         return item != null ? item : ItemStack.of(Material.WHEAT_SEEDS);
     }
 
+    private boolean checkCooldown(Player player) {
+        int secs = plugin.getConfigManager().getPlacementCooldownSeconds();
+        if (secs <= 0) return true;
+        long now = System.currentTimeMillis();
+        long last = placeCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        long elapsed = now - last;
+        if (elapsed < secs * 1000L) {
+            long remaining = (secs * 1000L - elapsed + 999) / 1000;
+            plugin.getMessagesManager().send(player, "placement_cooldown",
+                    "{seconds}", String.valueOf(remaining));
+            return false;
+        }
+        placeCooldowns.put(player.getUniqueId(), now);
+        return true;
+    }
+
     private void register(@NotNull PlacedCrop crop) {
         byUuid.put(crop.getUuid(), crop);
         byEntityId.put(crop.getVirtualEntityId(), crop.getUuid());
         long ck = ChunkKey.of(crop.getLocation());
         chunkCount.merge(ck, 1, Integer::sum);
-        byChunk.computeIfAbsent(ck, k -> new ArrayList<>()).add(crop.getUuid());
+        byChunk.computeIfAbsent(ck, k -> new CopyOnWriteArrayList<>()).add(crop.getUuid());
     }
 
     private void unregister(@NotNull PlacedCrop crop) {
@@ -189,22 +223,16 @@ public final class CropManager {
         int pcx = player.getLocation().getBlockX() >> 4;
         int pcz = player.getLocation().getBlockZ() >> 4;
         long maxDistSq = (long) maxDist * maxDist;
-
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                long ck = ChunkKey.of(pcx + dx, pcz + dz);
-                var bucket = byChunk.get(ck);
+                var bucket = byChunk.get(ChunkKey.of(pcx + dx, pcz + dz));
                 if (bucket == null) continue;
-                for (var uuid : List.copyOf(bucket)) {
+                for (var uuid : bucket) {
                     var crop = byUuid.get(uuid);
-                    if (crop == null) continue;
-                    if (!crop.getWorldName().equals(player.getWorld().getName())) continue;
-                    double ddx = crop.getX() - player.getX();
-                    double ddy = crop.getY() - player.getY();
-                    double ddz = crop.getZ() - player.getZ();
+                    if (crop == null || !crop.getWorldName().equals(player.getWorld().getName())) continue;
+                    double ddx = crop.getX() - player.getX(), ddy = crop.getY() - player.getY(), ddz = crop.getZ() - player.getZ();
                     if (ddx * ddx + ddy * ddy + ddz * ddz > maxDistSq) continue;
-                    plugin.getFoliaScheduler().runAt(crop.getLocation(),
-                            () -> spawnVisualForPlayer(crop, player));
+                    plugin.getFoliaScheduler().runAt(crop.getLocation(), () -> spawnVisualForPlayer(crop, player));
                 }
             }
         }
@@ -215,13 +243,35 @@ public final class CropManager {
     }
 
     public void reload() {
-        plugin.getSLF4JLogger().warn(
-                "CropManager: config reloaded but active growth tasks and already-placed crops " +
-                        "are NOT updated. A full server restart is required for structural changes.");
+        placeCooldowns.clear();
+        plugin.getSLF4JLogger().warn("CropManager: reload applied. Restart required for structural changes.");
     }
 
     public void shutdown() {
         growthTasks.values().forEach(ScheduledTask::cancel);
         growthTasks.clear();
+    }
+
+    /**
+     * Returns the PlacedCrop for a UUID, or null if not found.
+     */
+    public @Nullable PlacedCrop getByUuid(UUID uuid) {
+        return byUuid.get(uuid);
+    }
+
+    /**
+     * Admin-only hard removal — bypasses all ownership / stage checks.
+     * Drops NO item. Intended for /agrideco remove and cleanup scripts.
+     */
+    public boolean adminRemove(UUID cropUuid) {
+        var crop = byUuid.get(cropUuid);
+        if (crop == null) return false;
+        var loc = crop.getLocation();
+        unregister(crop);
+        plugin.getPacketHandler().despawnEntity(crop.getVirtualEntityId(), loc);
+        plugin.getDataRepository().deleteCrop(crop.getUuid());
+        plugin.getSLF4JLogger().info("Admin removed crop {} ({}) at {}",
+                crop.getUuid(), crop.getConfigId(), loc.toVector());
+        return true;
     }
 }

@@ -15,8 +15,8 @@ public final class MessagesManager {
 
     private final AgriDeco plugin;
     private final File file;
-    // Store as Component — deserialized once on load/reload, sent directly (no deprecated String overload)
     private volatile Map<String, Component> messages = Map.of();
+    private volatile Map<String, String> rawMessages = Map.of();
 
     public MessagesManager(@NotNull AgriDeco plugin) {
         this.plugin = plugin;
@@ -28,31 +28,31 @@ public final class MessagesManager {
     public void reload() {
         var cfg = YamlConfiguration.loadConfiguration(file);
         var sec = cfg.getConfigurationSection("messages");
-        var map = new HashMap<String, Component>();
-        if (sec != null)
-            sec.getKeys(false).forEach(k ->
-                    map.put(k, ColorUtil.component(sec.getString(k, ""))));
-        messages = Map.copyOf(map);
+        var components = new HashMap<String, Component>();
+        var raws = new HashMap<String, String>();
+        if (sec != null) {
+            sec.getKeys(false).forEach(k -> {
+                String raw = sec.getString(k, "");
+                raws.put(k, raw);
+                components.put(k, ColorUtil.component(raw));
+            });
+        }
+        messages = Map.copyOf(components);
+        rawMessages = Map.copyOf(raws);
     }
 
-    /**
-     * Returns the raw Component for a key, or a red error placeholder.
-     */
     public @NotNull Component get(String key) {
-        return messages.getOrDefault(key,
-                ColorUtil.component("<red>[Missing: " + key + "]"));
+        return messages.getOrDefault(key, ColorUtil.component("<red>[Missing message: " + key + "]"));
     }
 
     /**
-     * Sends a message, replacing {placeholder} tokens before deserialization.
-     * pairs: alternating placeholder, value — e.g. "{type}", "furniture", "{id}", "chair"
+     * Sends a message with {placeholder} replacements — no disk read.
      */
     public void send(@NotNull CommandSender sender, String key, String @NotNull ... pairs) {
         if (pairs.length == 0) {
             sender.sendMessage(get(key));
             return;
         }
-        // Re-deserialize with replacements so MiniMessage tags inside values still work
         var raw = getRaw(key);
         for (int i = 0; i + 1 < pairs.length; i += 2)
             raw = raw.replace(pairs[i], pairs[i + 1]);
@@ -63,12 +63,7 @@ public final class MessagesManager {
         sender.sendMessage(get(key));
     }
 
-    /**
-     * Returns the raw MiniMessage string for a key (needed for placeholder substitution).
-     */
     private String getRaw(String key) {
-        var cfg = YamlConfiguration.loadConfiguration(file);
-        var sec = cfg.getConfigurationSection("messages");
-        return sec != null ? sec.getString(key, "<red>[Missing: " + key + "]") : "<red>[Missing: " + key + "]";
+        return rawMessages.getOrDefault(key, "<red>[Missing message: " + key + "]");
     }
 }

@@ -24,6 +24,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,8 @@ public final class PacketHandler extends PacketListenerAbstract {
 
     private final AgriDeco plugin;
     private final ConcurrentHashMap<Integer, Consumer<Player>> clickHandlers = new ConcurrentHashMap<>();
+    // New: left-click (attack) handlers — used for player-initiated removal
+    private final ConcurrentHashMap<Integer, Consumer<Player>> attackHandlers = new ConcurrentHashMap<>();
 
     public PacketHandler(AgriDeco plugin) {
         super(PacketListenerPriority.NORMAL);
@@ -46,11 +49,20 @@ public final class PacketHandler extends PacketListenerAbstract {
     public void onPacketReceive(@NotNull PacketReceiveEvent event) {
         if (event.getPacketType() != PacketType.Play.Client.INTERACT_ENTITY) return;
         var wrap = new WrapperPlayClientInteractEntity(event);
-        if (wrap.getAction() == WrapperPlayClientInteractEntity.InteractAction.ATTACK) return;
-        var handler = clickHandlers.get(wrap.getEntityId());
+        int eid = wrap.getEntityId();
+        Player player = event.getPlayer();
+
+        if (wrap.getAction() == WrapperPlayClientInteractEntity.InteractAction.ATTACK) {
+            var handler = attackHandlers.get(eid);
+            if (handler == null) return;
+            event.setCancelled(true);
+            plugin.getFoliaScheduler().runAt(player.getLocation(), () -> handler.accept(player));
+            return;
+        }
+
+        var handler = clickHandlers.get(eid);
         if (handler == null) return;
         event.setCancelled(true);
-        Player player = event.getPlayer();
         plugin.getFoliaScheduler().runAt(player.getLocation(), () -> handler.accept(player));
     }
 
@@ -59,30 +71,39 @@ public final class PacketHandler extends PacketListenerAbstract {
                                                            ItemStack headItem,
                                                            boolean small, boolean invisible) {
         var spawn = new WrapperPlayServerSpawnEntity(
-                entityId,
-                Optional.of(UUID.randomUUID()),
-                EntityTypes.ARMOR_STAND,
+                entityId, Optional.of(UUID.randomUUID()), EntityTypes.ARMOR_STAND,
                 new Vector3d(loc.getX(), loc.getY(), loc.getZ()),
-                loc.getPitch(), loc.getYaw(), loc.getYaw(),
-                0, Optional.empty());
+                loc.getPitch(), loc.getYaw(), loc.getYaw(), 0, Optional.empty());
 
         List<EntityData<?>> meta = List.of(
                 new EntityData<>(0, EntityDataTypes.BYTE, (byte) (invisible ? 0x20 : 0x00)),
-                new EntityData<>(15, EntityDataTypes.BYTE, (byte) ((small ? 0x01 : 0x00) | 0x08 | 0x10))
-        );
+                new EntityData<>(15, EntityDataTypes.BYTE, (byte) ((small ? 0x01 : 0x00) | 0x08 | 0x10)));
         var metaPkt = new WrapperPlayServerEntityMetadata(entityId, meta);
-
-        var peItem = SpigotConversionUtil.fromBukkitItemStack(headItem);
-        var equipPkt = new WrapperPlayServerEntityEquipment(
-                entityId, List.of(new Equipment(EquipmentSlot.HELMET, peItem)));
+        var equipPkt = new WrapperPlayServerEntityEquipment(entityId,
+                List.of(new Equipment(EquipmentSlot.HELMET, SpigotConversionUtil.fromBukkitItemStack(headItem))));
 
         return new PacketWrapper[]{spawn, metaPkt, equipPkt};
     }
 
+    /**
+     * Spawn a virtual armor stand for all nearby players.
+     */
     public void spawnArmorStand(int entityId, Location location, ItemStack headItem,
-                                boolean small, boolean invisible, Consumer<Player> onClick) {
+                                boolean small, boolean invisible,
+                                @Nullable Consumer<Player> onClick,
+                                @Nullable Consumer<Player> onAttack) {
         if (onClick != null) clickHandlers.put(entityId, onClick);
+        if (onAttack != null) attackHandlers.put(entityId, onAttack);
         broadcast(location, buildSpawnPackets(entityId, location, headItem, small, invisible));
+    }
+
+    /**
+     * Overload without attack handler (backwards-compatible for crops).
+     */
+    public void spawnArmorStand(int entityId, Location location, ItemStack headItem,
+                                boolean small, boolean invisible,
+                                @Nullable Consumer<Player> onClick) {
+        spawnArmorStand(entityId, location, headItem, small, invisible, onClick, null);
     }
 
     public void spawnArmorStandForPlayer(Player player, int entityId, Location location,
@@ -92,6 +113,7 @@ public final class PacketHandler extends PacketListenerAbstract {
 
     public void despawnEntity(int entityId, Location location) {
         clickHandlers.remove(entityId);
+        attackHandlers.remove(entityId);
         broadcast(location, new WrapperPlayServerDestroyEntities(entityId));
     }
 
@@ -119,5 +141,6 @@ public final class PacketHandler extends PacketListenerAbstract {
     public void shutdown() {
         PacketEvents.getAPI().getEventManager().unregisterListener(this);
         clickHandlers.clear();
+        attackHandlers.clear();
     }
 }

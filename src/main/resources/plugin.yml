@@ -7,7 +7,6 @@ folia-supported: true
 libraries:
   - com.zaxxer:HikariCP:7.0.2
   - mysql:mysql-connector-java:9.6.0
-  - com.fasterxml.jackson.core:jackson-databind:3.1.0
 
 authors: [ SunMC ]
 softdepend: [ AuraSkills, Jobs, GriefPrevention ]

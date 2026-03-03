@@ -1,119 +1,126 @@
 # ─────────────────────────────────────────────────────────────
 #  AgriDeco — Main Configuration
-#  Plugin by SunMC
-# ─────────────────────────────────────────────────────────────
-#  After editing this file run:  /agrideco reload
-#  Note: structural changes (new furniture/crop definitions,
-#        growth timings) require a full server restart to apply
-#        to already-placed objects.
+#  Plugin by SunMC  |  /agrideco reload to apply most changes
+#  Full restart required for structural changes (new defs, etc)
 # ─────────────────────────────────────────────────────────────
 
-# Storage backend.
-# Options: sqlite | mysql
-# SQLite  — single file, no setup needed, recommended for small servers.
-# MySQL   — external database, recommended for networks / BungeeCord.
-storage-type: sqlite
+storage-type: sqlite   # sqlite | mysql
 
 # ─────────────────────────────────────────────────────────────
 #  General Settings
 # ─────────────────────────────────────────────────────────────
 settings:
 
-  # Maximum block distance at which virtual armor-stand entities
-  # (furniture & crops) are sent to a player's client.
-  # Higher values = more network traffic. Default: 32
   armorstands_max_distance: 32
-
-  # Permission node required to use /agrideco reload, give, and gui.
   reload_permission: "agrideco.admin"
 
-  # Maximum number of placed objects allowed per chunk.
-  # Prevents chunk-lag from over-decoration.
   chunk_limit:
     furnitures: 32
     crops: 64
 
+  # ── Player Removal ──────────────────────────────────────────
+  # Players remove furniture by left-clicking (attacking) the armor stand.
+  removal:
+    enabled: true             # Allow players to remove furniture at all
+    sneak_required: true      # Must be sneaking to remove (prevents accidents)
+    owner_only: true          # Only the owner (or agrideco.admin) can remove
+    drop_item: true           # Drop the furniture item back when removed
+
+  # ── Crop Harvesting ─────────────────────────────────────────
+  crops:
+    owner_only_harvest: false # Globally restrict harvest to the planting player
+    # Can also be set per-crop with owner_only_harvest: true
+
+  # ── Placement Cooldown ──────────────────────────────────────
+  placement:
+    cooldown_seconds: 0       # Seconds between placements per player (0 = disabled)
+    # Shared between furniture and crop placements
+
+  # ── Sounds ──────────────────────────────────────────────────
+  # Use Bukkit Sound enum names: https://jd.papermc.io/paper/1.21.11/org/bukkit/Sound.html
+  sounds:
+    place_furniture:
+      enabled: true
+      sound: "minecraft:block.wood.place"
+      volume: 1.0
+      pitch: 1.0
+
+    remove_furniture:
+      enabled: true
+      sound: "minecraft:entity.item.break"
+      volume: 1.0
+      pitch: 1.2
+
+    plant_crop:
+      enabled: true
+      sound: "minecraft:block.crop.break"
+      volume: 0.8
+      pitch: 1.5
+
+    harvest_crop:
+      enabled: true
+      sound: "minecraft:entity.experience_orb.pickup"
+      volume: 1.0
+      pitch: 1.0
+
 # ─────────────────────────────────────────────────────────────
 #  AuraSkills Integration
-#  Requires: AuraSkills plugin (softdepend)
 # ─────────────────────────────────────────────────────────────
 aura_skills:
-  # The skill that receives XP when a crop is harvested.
-  # Use built-in skill names (e.g. farming, foraging, fishing)
-  # OR the namespaced ID of a custom skill (e.g. my_pack:herbalism).
   skill: "farming"
 
 # ─────────────────────────────────────────────────────────────
-#  MySQL Database (only used when storage-type: mysql)
+#  MySQL (only used when storage-type: mysql)
 # ─────────────────────────────────────────────────────────────
 database:
   host: "localhost"
   port: 3306
-  database: "agrideco"   # Name of the database/schema
+  database: "agrideco"
   username: "root"
   password: "password"
-
-  # Connection pool tuning (HikariCP).
-  # For most servers the defaults are fine.
   pool:
-    maximum_pool_size: 10     # Max simultaneous DB connections
-    minimum_idle: 2           # Connections kept open when idle
-    connection_timeout: 30000 # ms to wait for a free connection before error
-    idle_timeout: 600000      # ms before an idle connection is closed
-    max_lifetime: 1800000     # ms maximum lifetime of any connection
+    maximum_pool_size: 10
+    minimum_idle: 2
+    connection_timeout: 30000
+    idle_timeout: 600000
+    max_lifetime: 1800000
 
 # ─────────────────────────────────────────────────────────────
 #  Furniture Definitions
-#  Each key (e.g. 'chair', 'lamp') is the config ID used in
-#  /agrideco give furniture <id> and stored in the database.
 # ─────────────────────────────────────────────────────────────
 furniture:
 
-  # ── Example: a simple decorative chair ──────────────────────
   chair:
-    # MMOItems reference: "mmoitems:<TYPE>:<ID>"
-    # This is the item players hold to place the furniture.
     id: "mmoitems:FURNITURE:CHAIR"
+    placement_type: "floor"          # floor | wall | ceiling
+    furniture_type: "seat"           # decorative | interactable | container | seat | light
 
-    # Where the furniture can be placed.
-    # Options: floor | wall | ceiling
-    placement_type: "floor"
-
-    # What happens when a player right-clicks the armor stand.
-    # Options:
-    #   decorative   — nothing happens on click
-    #   interactable — toggles between two visual states (id / interaction_mmoitem_id)
-    #   container    — opens a chest-like inventory
-    #   seat         — player sits on the furniture
-    #   light        — reserved for future light-toggle support
-    furniture_type: "seat"
-
-    # Only used when furniture_type is 'interactable'.
-    # This MMOItem is shown as the head when the toggle state is ON (state = 1).
+    # Only for furniture_type: interactable
     interaction_mmoitem_id: "mmoitems:FURNITURE:CHAIR_OPEN"
 
-    # Only used when furniture_type is 'container'.
+    # Only for furniture_type: container
     container:
-      title: "<dark_gray>Storage"  # MiniMessage format
-      size: 27                     # Must be a multiple of 9 (9, 18, 27, 36, 45, 54)
+      title: "<dark_gray>Storage"    # MiniMessage format
+      size: 27                       # Multiple of 9
 
-    # Offset applied to the placement location when spawning the armor stand.
-    # Format: "x, y, z"  — decimals allowed, can be negative.
     armorstand:
       offset: "0, 0, 0"
-      is_baby: false   # Baby armor stands are smaller — useful for low-profile items
+      is_baby: false
 
-    # Only used when furniture_type is 'seat'.
-    # Offset from the furniture's base location where the player sits.
+    # Only for furniture_type: seat
     seat_offset: "0, 0.3, 0"
 
-    # List of block offsets where BARRIER blocks are placed to prevent
-    # players walking through the furniture. One entry = one barrier block.
-    # Use "0, 0, 0" to place a barrier at the furniture's own location.
     barrier_offsets:
       - "0, 0, 0"
 
-  # ── Example: a wall-mounted lamp ─────────────────────────────
+    # ── Per-Item Permission Nodes ────────────────────────────
+    # Leave empty ("") to allow anyone with agrideco.use to place/remove.
+    place_permission: ""             # e.g. "agrideco.furniture.chair.place"
+    remove_permission: ""            # e.g. "agrideco.furniture.chair.remove"
+
+    # Override global settings.removal.drop_item for this specific piece.
+    remove_drop_item: true
+
   wall_lamp:
     id: "mmoitems:FURNITURE:WALL_LAMP"
     placement_type: "wall"
@@ -128,58 +135,40 @@ furniture:
     seat_offset: "0.5, 0, 0.5"
     barrier_offsets:
       - "0, 0, 0"
+    place_permission: ""
+    remove_permission: ""
+    remove_drop_item: true
 
 # ─────────────────────────────────────────────────────────────
 #  Crop Definitions
-#  Each key (e.g. 'carrot', 'blueberry') is the config ID used
-#  in /agrideco give crop <id> and stored in the database.
 # ─────────────────────────────────────────────────────────────
 crops:
 
-  # ── Example: a two-stage custom carrot ───────────────────────
   carrot:
-    # Ordered list of MMOItem IDs for each growth stage.
-    # Stage 0 = just planted, last stage = fully grown.
-    # The last entry's item is also dropped on harvest.
     crop_stage_ids:
       - "mmoitems:INGREDIENTS:CARROT_STAGE_I"
       - "mmoitems:INGREDIENTS:CARROT_STAGE_II"
-
-    # MMOItem ID of the seed item players hold to plant this crop.
     seed_id: "mmoitems:INGREDIENTS:CARROT_SEED"
-
-    # The block type that must be directly below the placement location.
-    # Uses Bukkit Material names (case-insensitive). Default: farmland
     placement_block_type: "farmland"
+    growth_time: 120                  # Ticks between growth checks
+    growth_chance: 40                 # % chance to advance per check
 
-    # How often (in ticks) the growth check runs.
-    # 20 ticks = 1 second. Default: 120 (6 seconds)
-    growth_time: 120
-
-    # Percentage chance (0–100) that the crop advances one stage
-    # each time the growth timer fires. Default: 40
-    growth_chance: 40
-
-    # AuraSkills XP granted to the harvesting player.
-    # Uses the skill defined in settings.aura_skills.skill above.
-    # Set to 0 to disable.
     aura_skills:
       experience: 1.4
 
-    # JobsReborn reward granted on harvest.
-    # job_id must match the job name in Jobs' config exactly.
-    # Set experience/money to 0 to disable individually.
     jobs:
       job_id: "farming"
       experience: 5.4
       money: 100.4
 
-    # Armor stand visual offset and size, same as furniture above.
     armorstand:
       offset: "0, 0.5, 0"
       is_baby: true
 
-  # ── Example: a three-stage blueberry bush ────────────────────
+    # ── Per-Crop Overrides ───────────────────────────────────
+    place_permission: ""              # e.g. "agrideco.crop.carrot.plant"
+    owner_only_harvest: false         # Override global crops.owner_only_harvest
+
   blueberry:
     crop_stage_ids:
       - "mmoitems:INGREDIENTS:BLUEBERRY_STAGE_I"
@@ -198,3 +187,5 @@ crops:
     armorstand:
       offset: "0, 0.3, 0"
       is_baby: false
+    place_permission: ""
+    owner_only_harvest: false
