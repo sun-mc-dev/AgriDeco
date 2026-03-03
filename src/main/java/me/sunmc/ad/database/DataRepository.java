@@ -20,6 +20,11 @@ import java.util.concurrent.Executors;
 
 public final class DataRepository {
 
+    private static final String SELECT_FURNITURE =
+            "SELECT uuid, config_id, world, x, y, z, yaw, owner, state FROM agrideco_furniture";
+    private static final String SELECT_CROPS =
+            "SELECT uuid, config_id, world, x, y, z, stage, owner FROM agrideco_crops";
+
     private final AgriDeco plugin;
     private final DatabaseManager db;
     private final Executor io = Executors.newVirtualThreadPerTaskExecutor();
@@ -88,7 +93,7 @@ public final class DataRepository {
             var list = new ArrayList<PlacedFurniture>();
             try (var c = db.getConnection();
                  var st = c.createStatement();
-                 var rs = st.executeQuery("SELECT * FROM agrideco_furniture")) {
+                 var rs = st.executeQuery(SELECT_FURNITURE)) {
                 while (rs.next()) {
                     var world = Bukkit.getWorld(rs.getString("world"));
                     if (world == null) continue;
@@ -105,9 +110,13 @@ public final class DataRepository {
                 }
             } catch (SQLException e) {
                 plugin.getSLF4JLogger().error("loadAllFurniture failed", e);
+                throw new RuntimeException(e);
             }
             return list;
-        }, io);
+        }, io).exceptionally(ex -> {
+            plugin.getSLF4JLogger().error("loadAllFurniture — returning empty list due to error", ex);
+            return List.of();
+        });
     }
 
     @Contract("_ -> new")
@@ -150,7 +159,7 @@ public final class DataRepository {
             var list = new ArrayList<PlacedCrop>();
             try (var c = db.getConnection();
                  var st = c.createStatement();
-                 var rs = st.executeQuery("SELECT * FROM agrideco_crops")) {
+                 var rs = st.executeQuery(SELECT_CROPS)) {
                 while (rs.next()) {
                     var world = Bukkit.getWorld(rs.getString("world"));
                     if (world == null) continue;
@@ -166,8 +175,12 @@ public final class DataRepository {
                 }
             } catch (SQLException e) {
                 plugin.getSLF4JLogger().error("loadAllCrops failed", e);
+                throw new RuntimeException(e);
             }
             return list;
-        }, io);
+        }, io).exceptionally(ex -> {
+            plugin.getSLF4JLogger().error("loadAllCrops — returning empty list due to error", ex);
+            return List.of();
+        });
     }
 }

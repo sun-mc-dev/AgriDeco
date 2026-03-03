@@ -4,6 +4,7 @@ import me.sunmc.ad.AgriDeco;
 import me.sunmc.ad.data.FurnitureDef;
 import me.sunmc.ad.data.PlacedFurniture;
 import me.sunmc.ad.data.enums.FurnitureType;
+import me.sunmc.ad.gui.FurnitureContainerHolder;
 import me.sunmc.ad.packet.VirtualEntity;
 import me.sunmc.ad.util.ChunkKey;
 import me.sunmc.ad.util.ColorUtil;
@@ -14,7 +15,10 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,24 +33,23 @@ public final class FurnitureManager {
     private final ConcurrentHashMap<Long, UUID> barrierLocations = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, UUID> seatStands = new ConcurrentHashMap<>();
 
+    private final ConcurrentHashMap<Long, List<UUID>> byChunk = new ConcurrentHashMap<>();
+
     public FurnitureManager(AgriDeco plugin) {
         this.plugin = plugin;
-    }
-
-    private static long blockKey(@NotNull Location loc) {
-        int x = loc.getBlockX(), y = loc.getBlockY(), z = loc.getBlockZ();
-        return ((long) (x & 0x3FFFFFF) << 38) | ((long) (y & 0xFFF) << 26) | (z & 0x3FFFFFF);
     }
 
     public void loadFromDatabase() {
         plugin.getDataRepository().loadAllFurniture().thenAccept(list -> {
             for (var pf : list) {
                 register(pf);
+
                 plugin.getFoliaScheduler().runAt(pf.getLocation(), () -> {
                     var def = plugin.getConfigManager().getFurnitureDefs().get(pf.getConfigId());
                     if (def != null) trackBarriers(def, pf.getLocation(), pf.getUuid());
                     spawnVisual(pf);
-                });
+                }, () -> plugin.getSLF4JLogger().warn(
+                        "Chunk unloaded before furniture visual could spawn: {}", pf.getUuid()));
             }
             plugin.getSLF4JLogger().info("Loaded {} furniture pieces.", list.size());
         });
@@ -55,25 +58,21 @@ public final class FurnitureManager {
     public boolean place(Player player, String configId, Location loc) {
         var def = plugin.getConfigManager().getFurnitureDefs().get(configId);
         if (def == null) return false;
-
         if (!isValidPlacement(def, loc)) {
             plugin.getMessagesManager().send(player, "invalid_placement");
             return false;
         }
-
         long ck = ChunkKey.of(loc);
         if (chunkCount.getOrDefault(ck, 0) >= plugin.getConfigManager().getChunkLimitFurnitures()) {
             plugin.getMessagesManager().send(player, "chunk_limit");
             return false;
         }
-
         if (!plugin.getIntegrations().canBuild(player, loc)) {
             plugin.getMessagesManager().send(player, "invalid_placement");
             return false;
         }
 
-        var pf = new PlacedFurniture(UUID.randomUUID(), configId, loc,
-                player.getUniqueId(), VirtualEntity.nextId());
+        var pf = new PlacedFurniture(UUID.randomUUID(), configId, loc, player.getUniqueId(), VirtualEntity.nextId());
         register(pf);
         placeBarriers(def, loc, pf.getUuid());
         spawnVisual(pf);
@@ -98,18 +97,16 @@ public final class FurnitureManager {
         var def = plugin.getConfigManager().getFurnitureDefs().get(pf.getConfigId());
         if (def == null) return;
         var head = resolveHead(def, pf.getInteractionState());
-        var visual = pf.getLocation().clone().add(def.getArmorstandOffset());
-        plugin.getPacketHandler().spawnArmorStand(
-                pf.getVirtualEntityId(), visual, head,
-                def.isArmorstandBaby(), true,
-                p -> handleClick(p, pf));
+        var visual = pf.getLocation().add(def.getArmorstandOffset()); // no extra clone — getLocation() already new
+        plugin.getPacketHandler().spawnArmorStand(pf.getVirtualEntityId(), visual, head,
+                def.isArmorstandBaby(), true, p -> handleClick(p, pf));
     }
 
     public void spawnVisualForPlayer(@NotNull PlacedFurniture pf, Player player) {
         var def = plugin.getConfigManager().getFurnitureDefs().get(pf.getConfigId());
         if (def == null) return;
         var head = resolveHead(def, pf.getInteractionState());
-        var visual = pf.getLocation().clone().add(def.getArmorstandOffset());
+        var visual = pf.getLocation().add(def.getArmorstandOffset());
         plugin.getPacketHandler().spawnArmorStandForPlayer(
                 player, pf.getVirtualEntityId(), visual, head, def.isArmorstandBaby(), true);
     }
@@ -118,14 +115,14 @@ public final class FurnitureManager {
         String mmoId = (def.getFurnitureType() == FurnitureType.INTERACTABLE && state == 1)
                 ? def.getInteractionId() : def.getId();
         var item = plugin.getIntegrations().getMmoItem(mmoId);
-        return item != null ? item : new ItemStack(Material.BARRIER);
+        return item != null ? item : ItemStack.of(Material.BARRIER);
     }
 
     private void handleClick(Player player, @NotNull PlacedFurniture pf) {
         var def = plugin.getConfigManager().getFurnitureDefs().get(pf.getConfigId());
         if (def == null) return;
         switch (def.getFurnitureType()) {
-            case INTERACTABLE -> handleInteract(pf, def);
+            case INTERACTABLE -> handleInteract(pf);
             case CONTAINER -> openContainer(player, def);
             case SEAT -> seatPlayer(player, pf, def);
             default -> {
@@ -133,7 +130,7 @@ public final class FurnitureManager {
         }
     }
 
-    private void handleInteract(@NotNull PlacedFurniture pf, FurnitureDef def) {
+    private void handleInteract(@NotNull PlacedFurniture pf) {
         pf.setInteractionState((pf.getInteractionState() + 1) % 2);
         plugin.getPacketHandler().despawnEntity(pf.getVirtualEntityId(), pf.getLocation());
         spawnVisual(pf);
@@ -141,14 +138,15 @@ public final class FurnitureManager {
     }
 
     private void openContainer(@NotNull Player player, @NotNull FurnitureDef def) {
+        var holder = new FurnitureContainerHolder();
         var inv = plugin.getServer().createInventory(
-                null, def.getContainerSize(),
-                ColorUtil.component(def.getContainerTitle()));
+                holder, def.getContainerSize(), ColorUtil.component(def.getContainerTitle()));
+        holder.setInventory(inv);
         player.openInventory(inv);
     }
 
     private void seatPlayer(Player player, @NotNull PlacedFurniture pf, @NotNull FurnitureDef def) {
-        var seatLoc = pf.getLocation().clone().add(def.getSeatOffset());
+        var seatLoc = pf.getLocation().add(def.getSeatOffset());
         plugin.getFoliaScheduler().runAt(seatLoc, () -> {
             var stand = seatLoc.getWorld().spawn(seatLoc, ArmorStand.class, as -> {
                 as.setVisible(false);
@@ -172,7 +170,7 @@ public final class FurnitureManager {
     }
 
     public boolean isFurnitureBarrier(Location loc) {
-        return barrierLocations.containsKey(blockKey(loc));
+        return barrierLocations.containsKey(ChunkKey.block(loc)); // Fix #7: unified ChunkKey
     }
 
     private void placeBarriers(@NotNull FurnitureDef def, Location loc, UUID furnitureUuid) {
@@ -180,20 +178,20 @@ public final class FurnitureManager {
             var bl = loc.clone().add(offset);
             Block b = bl.getBlock();
             if (b.getType() == Material.AIR) b.setType(Material.BARRIER);
-            barrierLocations.put(blockKey(bl), furnitureUuid);
+            barrierLocations.put(ChunkKey.block(bl), furnitureUuid);
         }
     }
 
     private void trackBarriers(@NotNull FurnitureDef def, Location loc, UUID furnitureUuid) {
         for (var offset : def.getBarrierOffsets())
-            barrierLocations.put(blockKey(loc.clone().add(offset)), furnitureUuid);
+            barrierLocations.put(ChunkKey.block(loc.clone().add(offset)), furnitureUuid);
     }
 
-    private void removeBarriers(FurnitureDef def, Location loc) {
+    private void removeBarriers(@Nullable FurnitureDef def, Location loc) {
         if (def == null) return;
         for (var offset : def.getBarrierOffsets()) {
             var bl = loc.clone().add(offset);
-            barrierLocations.remove(blockKey(bl));
+            barrierLocations.remove(ChunkKey.block(bl));
             Block b = bl.getBlock();
             if (b.getType() == Material.BARRIER) b.setType(Material.AIR);
         }
@@ -207,27 +205,51 @@ public final class FurnitureManager {
         };
     }
 
-    private void register(PlacedFurniture pf) {
+    private void register(@NotNull PlacedFurniture pf) {
         byUuid.put(pf.getUuid(), pf);
         byEntityId.put(pf.getVirtualEntityId(), pf.getUuid());
         chunkCount.merge(ChunkKey.of(pf.getLocation()), 1, Integer::sum);
+
+        byChunk.computeIfAbsent(ChunkKey.of(pf.getLocation()),
+                k -> new ArrayList<>()).add(pf.getUuid());
     }
 
     private void unregister(@NotNull PlacedFurniture pf) {
         byUuid.remove(pf.getUuid());
         byEntityId.remove(pf.getVirtualEntityId());
-        chunkCount.computeIfPresent(ChunkKey.of(pf.getLocation()),
-                (k, v) -> v <= 1 ? null : v - 1);
+        long ck = ChunkKey.of(pf.getLocation());
+        chunkCount.computeIfPresent(ck, (k, v) -> v <= 1 ? null : v - 1);
+        var bucket = byChunk.get(ck);
+        if (bucket != null) {
+            bucket.remove(pf.getUuid());
+            if (bucket.isEmpty()) byChunk.remove(ck);
+        }
     }
 
-    public void sendVisibleFurnitureTo(Player player) {
+    public void sendVisibleFurnitureTo(@NotNull Player player) {
         int maxDist = plugin.getConfigManager().getMaxArmorStandDistance();
+        int chunkRadius = (maxDist >> 4) + 1;
+        int pcx = player.getLocation().getBlockX() >> 4;
+        int pcz = player.getLocation().getBlockZ() >> 4;
         long maxDistSq = (long) maxDist * maxDist;
-        for (var pf : byUuid.values()) {
-            if (!pf.getLocation().getWorld().equals(player.getWorld())) continue;
-            if (pf.getLocation().distanceSquared(player.getLocation()) > maxDistSq) continue;
-            plugin.getFoliaScheduler().runAt(pf.getLocation(),
-                    () -> spawnVisualForPlayer(pf, player));
+
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                long ck = ChunkKey.of(pcx + dx, pcz + dz);
+                var bucket = byChunk.get(ck);
+                if (bucket == null) continue;
+                for (var uuid : List.copyOf(bucket)) {
+                    var pf = byUuid.get(uuid);
+                    if (pf == null) continue;
+                    if (!pf.getWorldName().equals(player.getWorld().getName())) continue;
+                    double ddx = pf.getX() - player.getX();
+                    double ddy = pf.getY() - player.getY();
+                    double ddz = pf.getZ() - player.getZ();
+                    if (ddx * ddx + ddy * ddy + ddz * ddz > maxDistSq) continue;
+                    plugin.getFoliaScheduler().runAt(pf.getLocation(),
+                            () -> spawnVisualForPlayer(pf, player));
+                }
+            }
         }
     }
 
@@ -236,6 +258,9 @@ public final class FurnitureManager {
     }
 
     public void reload() {
+        plugin.getSLF4JLogger().warn(
+                "FurnitureManager: config reloaded but already-placed objects are NOT updated. " +
+                        "A full server restart is required for structural definition changes to take effect.");
     }
 
     public void shutdown() {

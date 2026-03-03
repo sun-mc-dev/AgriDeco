@@ -5,6 +5,7 @@ import me.sunmc.ad.AgriDeco;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.TimeUnit;
 
@@ -16,8 +17,22 @@ public final class FoliaScheduler {
         this.plugin = plugin;
     }
 
+    /**
+     * Overload with a retired callback so callers can react when the
+     * target chunk is unloaded before the task runs.
+     */
+    public void runAt(Location loc, Runnable task, @Nullable Runnable retired) {
+        plugin.getServer().getRegionScheduler().run(plugin, loc,
+                $ -> task.run(),
+                retired != null ? retired : () -> {
+                });
+    }
+
+    /**
+     * Convenience overload — no retired callback (silent on unloaded chunk).
+     */
     public void runAt(Location loc, Runnable task) {
-        plugin.getServer().getRegionScheduler().run(plugin, loc, $ -> task.run());
+        runAt(loc, task, null);
     }
 
     public void runGlobal(Runnable task) {

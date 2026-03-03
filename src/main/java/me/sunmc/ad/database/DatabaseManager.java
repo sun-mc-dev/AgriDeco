@@ -16,6 +16,7 @@ public final class DatabaseManager {
     private final AgriDeco plugin;
     private HikariDataSource dataSource;
     private StorageType storageType;
+
     public DatabaseManager(AgriDeco plugin) {
         this.plugin = plugin;
     }

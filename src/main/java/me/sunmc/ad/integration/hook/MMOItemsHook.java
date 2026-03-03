@@ -3,8 +3,7 @@ package me.sunmc.ad.integration.hook;
 import me.sunmc.ad.AgriDeco;
 import net.Indyuce.mmoitems.MMOItems;
 import org.bukkit.inventory.ItemStack;
-
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class MMOItemsHook {
 

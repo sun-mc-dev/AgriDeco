@@ -67,7 +67,7 @@ public final class PacketHandler extends PacketListenerAbstract {
                 0, Optional.empty());
 
         List<EntityData<?>> meta = List.of(
-                new EntityData<>(0,  EntityDataTypes.BYTE, (byte) (invisible ? 0x20 : 0x00)),
+                new EntityData<>(0, EntityDataTypes.BYTE, (byte) (invisible ? 0x20 : 0x00)),
                 new EntityData<>(15, EntityDataTypes.BYTE, (byte) ((small ? 0x01 : 0x00) | 0x08 | 0x10))
         );
         var metaPkt = new WrapperPlayServerEntityMetadata(entityId, meta);
