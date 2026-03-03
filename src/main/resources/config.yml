@@ -1,0 +1,55 @@
+storage-type: sqlite   # sqlite | mysql
+
+settings:
+  armorstands_max_distance: 32
+  reload_permission: "agrideco.admin"
+  chunk_limit:
+    furnitures: 32
+    crops: 64
+
+database:
+  host: "localhost"
+  port: 3306
+  database: "agrideco"
+  username: "root"
+  password: "password"
+  pool:
+    maximum_pool_size: 10
+    minimum_idle: 2
+    connection_timeout: 30000
+    idle_timeout: 600000
+    max_lifetime: 1800000
+
+furniture:
+  '1':
+    id: "mmoitems:TYPE:ID"
+    placement_type: "floor"
+    furniture_type: "interactable"
+    interaction_mmoitem_id: "mmoitems:TYPE:ID"
+    container:
+      title: "&8Container"
+      size: 9
+    armorstand:
+      offset: "0, 0.5, 0"
+      is_baby: true
+    seat_offset: "0.5, 0, 0.5"
+    barrier_offsets: [ "0, 0, 0" ]
+
+crops:
+  '1':
+    crop_stage_ids:
+      - "mmoitems:INGREDIENTS:CARROT_STAGE_I"
+      - "mmoitems:INGREDIENTS:CARROT_STAGE_II"
+    seed_id: "mmoitems:INGREDIENTS:CARROT_SEED"
+    placement_block_type: "farmland"
+    growth_time: 120
+    growth_chance: 40
+    aura_skills:
+      experience: 1.4
+    jobs:
+      job_id: "farming"
+      experience: 5.4
+      money: 100.4
+    armorstand:
+      offset: "0, 0.5, 0"
+      is_baby: true
