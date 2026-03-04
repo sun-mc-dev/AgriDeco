@@ -12,6 +12,8 @@ import me.sunmc.ad.manager.CropManager;
 import me.sunmc.ad.manager.FurnitureManager;
 import me.sunmc.ad.packet.PacketHandler;
 import me.sunmc.ad.util.scheduler.FoliaScheduler;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Objects;
@@ -79,7 +81,8 @@ public final class AgriDeco extends JavaPlugin {
             });
         });
 
-        getSLF4JLogger().info("AgriDeco v{} started on Folia!", getPluginMeta().getVersion());
+        getComponentLogger().info(Component.text(
+                "AgriDeco " + getPluginMeta().getVersion() + " enabled!", NamedTextColor.DARK_GREEN));
     }
 
     @Override
@@ -88,7 +91,7 @@ public final class AgriDeco extends JavaPlugin {
         if (furnitureManager != null) furnitureManager.shutdown();
         if (databaseManager != null) databaseManager.shutdown();
         if (packetHandler != null) packetHandler.shutdown();
-        getSLF4JLogger().info("AgriDeco disabled.");
+        getComponentLogger().info(Component.text("AgriDeco disabled!", NamedTextColor.DARK_RED));
     }
 
     public void reload() {

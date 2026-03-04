@@ -11,7 +11,7 @@ messages:
   prefix: "<dark_gray>[<green>AgriDeco<dark_gray>] "
   plugin_reload: "<green>Reloaded. <yellow><italic>(Restart for structural changes.)"
   no_permission: "<dark_red>[!] <red>You don't have permission to do that."
-  invalid_command: "<dark_red>[!] <red>Usage: /agrideco <gray><reload|give|gui>"
+  invalid_command: "<dark_red>[!] <red>Usage: /agrideco <gray><reload|give|remove|gui>"
   invalid_configuration: "<dark_red>[!] <red>Configuration error — check the console."
 
   # Placement
