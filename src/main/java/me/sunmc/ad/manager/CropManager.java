@@ -1,11 +1,11 @@
 package me.sunmc.ad.manager;
 
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import me.sunmc.ad.AgriDeco;
 import me.sunmc.ad.data.CropDef;
 import me.sunmc.ad.data.PlacedCrop;
 import me.sunmc.ad.packet.VirtualEntity;
 import me.sunmc.ad.util.ChunkKey;
+import me.sunmc.ad.util.scheduler.FoliaScheduler;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -26,7 +26,7 @@ public final class CropManager {
     private final ConcurrentHashMap<UUID, PlacedCrop> byUuid = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, UUID> byEntityId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Integer> chunkCount = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, ScheduledTask> growthTasks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, FoliaScheduler.TaskHandle> growthTasks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<UUID>> byChunk = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> placeCooldowns = new ConcurrentHashMap<>();
 
@@ -248,7 +248,7 @@ public final class CropManager {
     }
 
     public void shutdown() {
-        growthTasks.values().forEach(ScheduledTask::cancel);
+        growthTasks.values().forEach(FoliaScheduler.TaskHandle::cancel);
         growthTasks.clear();
     }
 

@@ -6,6 +6,7 @@ folia-supported: true
 
 libraries:
   - com.zaxxer:HikariCP:7.0.2
+  - org.xerial:sqlite-jdbc:3.51.2.0
   - mysql:mysql-connector-java:9.6.0
 
 authors: [ SunMC ]
@@ -16,7 +17,7 @@ commands:
   agrideco:
     description: "AgriDeco main command."
     aliases: [ deco, agri ]
-    usage: "/<command> <reload|give|gui>"
+    usage: "/<command> <reload|give|remove|gui>"
     permission: agrideco.use
 
 permissions:
